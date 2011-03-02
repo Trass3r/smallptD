@@ -71,7 +71,7 @@ __gshared immutable Sphere[9] spheres = [ //Scene: radius, position, emission, c
 	Sphere(1e5, Vec3(50,-1e5+81.6,81.6),	Vec3(),			Vec3(.75,.75,.75),	Refl.DIFF),//Top
 	Sphere(16.5,Vec3(27,16.5,47),		Vec3(),			Vec3(1,1,1)*.999,	Refl.SPEC),//Mirr
 	Sphere(16.5,Vec3(73,16.5,78),		Vec3(),			Vec3(1,1,1)*.999,	Refl.REFR),//Glas
-	Sphere(600, Vec3(50,681.6-.27,81.6),	Vec3(12,12,12),	Vec3(),				Refl.DIFF) //Lite
+	Sphere(1.5, Vec3(50,81.6-16.5,81.6),Vec3(4,4,4)*100,  Vec3(), Refl.DIFF),//Lite
 ];
 T clamp(T)(T x){ return x<0 ? 0 : x>1 ? 1 : x; }
 int toInt(double x){ return cast(int)(pow(clamp(x),1/2.2)*255+.5); }
@@ -86,7 +86,7 @@ bool intersect(const ref Ray r, out double t, out size_t id)
 	}
 	return t<inf;
 }
-Vec3 radiance(const ref Ray r, int depth, ushort *Xi = null)
+Vec3 radiance(const ref Ray r, int depth, ushort *Xi = null, int E=1)
 {
 	double t=0;	// distance to intersection
 	size_t id=0;	// id of intersected object
@@ -95,18 +95,40 @@ Vec3 radiance(const ref Ray r, int depth, ushort *Xi = null)
 	const Sphere obj = spheres[id];				// the hit object
 	Vec3 x=r.o+r.d*t, n=(x-obj.p).norm(), nl=n.dot(r.d)<0?n:n*-1, f=obj.c;
 	double p = f.x>f.y && f.x>f.z ? f.x : f.y>f.z ? f.y : f.z; // max refl
-	if (++depth>5)
+	if (++depth>5 || !p)
 		if (uniform(0.0, 1.0)<p)
 			f=f*(1/p);
 		else
-			return obj.e; //R.R.
+			return obj.e * E;
 
 	if (obj.refl == Refl.DIFF)
 	{									// Ideal DIFFUSE reflection
 		double r1=2*PI*uniform(0.0, 1.0), r2=uniform(0.0, 1.0), r2s=sqrt(r2);
 		Vec3 w=nl, u=((fabs(w.x)>.1?Vec3(0,1):Vec3(1))%w).norm(), v=w%u;
 		Vec3 d = (u*cos(r1)*r2s + v*sin(r1)*r2s + w*sqrt(1-r2)).norm();
-		return obj.e + f * radiance(Ray(x,d),depth,Xi);
+
+		// Loop over any lights
+		Vec3 e;
+		foreach (i, s; spheres)
+		{
+			if (s.e.x<=0 && s.e.y<=0 && s.e.z<=0)
+				continue; // skip non-lights
+
+			Vec3 sw=s.p-x, su=((fabs(sw.x)>.1?Vec3(0,1):Vec3(1))%sw).norm(), sv=sw%su;
+			double cos_a_max = sqrt(1-s.rad*s.rad/(x-s.p).dot(x-s.p));
+			double eps1 = uniform(0.0, 1.0), eps2 = uniform(0.0, 1.0);
+			double cos_a = 1-eps1+eps1*cos_a_max;
+			double sin_a = sqrt(1-cos_a*cos_a);
+			double phi = 2*PI*eps2;
+			Vec3 l = su*cos(phi)*sin_a + sv*sin(phi)*sin_a + sw*cos_a;
+			l.norm();
+			if (intersect(Ray(x,l), t, id) && id==i){	// shadow ray
+				double omega = 2*PI*(1-cos_a_max);
+				e = e + f * (s.e*l.dot(nl)*omega)*(1/PI);  // 1/pi for brdf
+			}
+		}
+
+		return obj.e*E+e+f * (radiance(Ray(x,d),depth,Xi,0));
 	}
 	else if (obj.refl == Refl.SPEC)						// Ideal SPECULAR reflection
 		return obj.e + f * radiance(Ray(x,r.d-n*2*n.dot(r.d)),depth,Xi);
