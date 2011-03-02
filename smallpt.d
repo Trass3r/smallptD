@@ -1,7 +1,7 @@
 /**
  * smallptD
  * a tiny path tracer in D
- * (C) 2010 Trass3r
+ * (C) 2010-11 Trass3r
  *
  * originally written in C++ by Kevin Beason, 2008
  * Make : g++ -O3 -fopenmp smallpt.cpp -o smallpt
@@ -22,7 +22,7 @@ struct Vec(T)
 	Vec opSub(const Vec b) const { return Vec(x-b.x,y-b.y,z-b.z); }
 	Vec opMul(T b) const { return Vec(x*b,y*b,z*b); }
 	Vec opMul(const Vec b) const { return Vec(x*b.x,y*b.y,z*b.z); }
-	Vec norm(){ return this * (1/sqrt(x*x+y*y+z*z)); }
+	ref Vec norm(){ this = this * (1/sqrt(x*x+y*y+z*z)); return this;}
 	T dot(const Vec b) const { return x*b.x+y*b.y+z*b.z; } // cross:
 	Vec opMod(const Vec b) const {return Vec(y*b.z-z*b.y,z*b.x-x*b.z,x*b.y-y*b.x);}
 }
@@ -75,18 +75,21 @@ __gshared immutable Sphere[9] spheres = [ //Scene: radius, position, emission, c
 ];
 T clamp(T)(T x){ return x<0 ? 0 : x>1 ? 1 : x; }
 int toInt(double x){ return cast(int)(pow(clamp(x),1/2.2)*255+.5); }
-bool intersect(const ref Ray r, ref double t, ref int id)
+bool intersect(const ref Ray r, out double t, out size_t id)
 {
 	double d=0, inf=t=1e20;
-	foreach_reverse(i, _; spheres)
-		if((d=spheres[i].intersect(r)) >= 0 && d<t)
+	foreach_reverse(i, sphere; spheres)
+	{
+		d=sphere.intersect(r);
+		if(d > 0 && d<t)
 			{t=d; id=i;}
+	}
 	return t<inf;
 }
 Vec radiance(const ref Ray r, int depth, ushort *Xi = null)
 {
 	double t=0;	// distance to intersection
-	int id=0;	// id of intersected object
+	size_t id=0;	// id of intersected object
 	if (!intersect(r, t, id))
 		return Vec3(); // if miss, return black
 	const Sphere obj = spheres[id];				// the hit object
