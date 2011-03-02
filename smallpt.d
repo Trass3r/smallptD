@@ -86,7 +86,7 @@ bool intersect(const ref Ray r, out double t, out size_t id)
 	}
 	return t<inf;
 }
-Vec radiance(const ref Ray r, int depth, ushort *Xi = null)
+Vec3 radiance(const ref Ray r, int depth, ushort *Xi = null)
 {
 	double t=0;	// distance to intersection
 	size_t id=0;	// id of intersected object
