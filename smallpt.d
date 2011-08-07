@@ -15,18 +15,16 @@ import std.math;
 import std.random;
 import std.stdio;
 
-struct Vec(T)
+alias Vec!double Vec3; struct Vec(T)
 {
-	T x=0, y=0, z=0;									// position, also color (r,g,b)
-	Vec opAdd(const Vec b) const { return Vec(x+b.x,y+b.y,z+b.z); }
-	Vec opSub(const Vec b) const { return Vec(x-b.x,y-b.y,z-b.z); }
-	Vec opMul(T b) const { return Vec(x*b,y*b,z*b); }
-	Vec opMul(const Vec b) const { return Vec(x*b.x,y*b.y,z*b.z); }
+	union{struct{T x=0, y=0, z=0;} struct{T r=0, g=0, b=0;} // position+color (r,g,b)
+	Vec opBinary(string op)(const Vec b)const{mixin(`return Vec(x`~op~`b.x,y`~op~`b.y,z`~op~`b.z);`);}
+	Vec opBinary(string op="*")(T b) const { return Vec(x*b,y*b,z*b); }
+	Vec opOpAssign(string op)(const Vec b)const{mixin();}
 	ref Vec norm(){ this = this * (1/sqrt(x*x+y*y+z*z)); return this;}
 	T dot(const Vec b) const { return x*b.x+y*b.y+z*b.z; } // cross:
 	Vec opMod(const Vec b) const {return Vec(y*b.z-z*b.y,z*b.x-x*b.z,x*b.y-y*b.x);}
 }
-alias Vec!double Vec3;
 
 unittest
 {
@@ -41,6 +39,7 @@ unittest
 	auto t = v1 - Vec3(-0.44721359549995793928183473374626, 0, 0.89442719099991587856366946749251);
 	assert(sqrt(t.x*t.x + t.y*t.y + t.z*t.z) <= 0.001);
 }
+
 struct Ray
 {
 	Vec3 o, d;
